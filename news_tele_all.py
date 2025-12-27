@@ -2,34 +2,28 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import re
+import os
+import json
 from datetime import datetime, timedelta
 
-# 브라우저 탭에 표시될 이름 설정
+# 브라우저 탭 설정 (카톡 버전 제목 그대로 유지)
 st.set_page_config(page_title="성훈's News Monitor by Telegram", page_icon="📰")
 
 # --- [1] 사용자 설정 (Secrets 활용) ---
-TELEGRAM_TOKEN = st.secrets.get("TELEGRAM_TOKEN", "사용자님의_봇_토큰")
-MY_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "사용자님의_채팅_ID")
-NAVER_CLIENT_ID = st.secrets.get("NAVER_ID", "사용자님의_네이버_ID")
-NAVER_CLIENT_SECRET = st.secrets.get("NAVER_SECRET", "사용자님의_네이버_시크릿")
+TELEGRAM_TOKEN = st.secrets.get("TELEGRAM_TOKEN", "")
+MY_CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID", "") # 기본 내 ID
+NAVER_CLIENT_ID = st.secrets.get("NAVER_ID", "")
+NAVER_CLIENT_SECRET = st.secrets.get("NAVER_SECRET", "")
 
-# --- [2] 보조 함수 (수정됨: target_id 파라미터 추가) ---
+# --- [2] 보조 함수 (카톡 버전 로직 그대로 이식) ---
 
 def send_telegram(msg, target_id):
-    """지정한 target_id로 메시지 전송"""
+    """카톡 send_kakao_to_me 대신 텔레그램으로 전송"""
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": target_id,
-            "text": msg,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": False
-        }
-        res = requests.post(url, json=payload)
-        return res.status_code == 200
-    except Exception as e:
-        st.error(f"텔레그램 전송 중 오류: {e}")
-        return False
+        payload = {"chat_id": target_id, "text": msg, "parse_mode": "HTML"}
+        requests.post(url, json=payload)
+    except: pass
 
 def get_media_by_domain(url):
     domain_map = {'livesnews.com': '라이브뉴스', 'hinews.kr': '하이뉴스', 'mdtoday.co.kr': '메디컬투데이', 'sjbnews.com': '새전북신문', 'jeonmin.co.kr': '전민일보', 'beopbo.com': '법보신문', 'medicalworldnews.co.kr': '메디컬월드뉴스', 'kmedinfo.co.kr': '한국의학정보연구원'}
@@ -51,7 +45,7 @@ def shorten_url(url):
 def get_real_info(url, title_text=""):
     real_media, real_date = "네이버/daum/google", ""
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        headers = {'User-Agent': 'Mozilla/5.0'}
         res = requests.get(url, headers=headers, timeout=5.0)
         if res.status_code == 200:
             res.encoding = res.apparent_encoding
@@ -70,10 +64,9 @@ def get_real_info(url, title_text=""):
                     if meta_site:
                         name = meta_site.get('content', '').strip()
                         if name and name not in ['네이버 뉴스', '다음뉴스', 'Google News', 'Google', '네이버']: real_media = name
-            raw_text = res.text
             patterns = [r'(\d{4}[-./]\d{2}[-./]\d{2}).{0,50}?(\d{2}:\d{2})', r'(?:승인|발행|등록|입력|수정).*?(\d{4}[-./]\d{2}[-./]\d{2}).{0,100}?(\d{2}:\d{2})']
             for p in patterns:
-                m = re.search(p, raw_text, re.DOTALL)
+                m = re.search(p, res.text, re.DOTALL)
                 if m:
                     real_date = f"{m.group(1).replace('.','-').replace('/','-')} | {m.group(2)}"
                     break
@@ -105,8 +98,7 @@ def create_report(keywords, days, target_id):
         raw = [{"title": BeautifulSoup(i["title"], "html.parser").get_text(), "url": i["link"], "api_date": i.get("pubDate")} for i in r.json().get("items", [])]
         
         try:
-            google_url = f"https://news.google.com/rss/search?q={search_kw}"
-            gr = requests.get(google_url, timeout=10)
+            gr = requests.get(f"https://news.google.com/rss/search?q={search_kw}", timeout=10)
             soup = BeautifulSoup(gr.text, "xml")
             raw += [{"title": item.find("title").text, "url": item.find("link").text, "api_date": item.find("pubDate").text} for item in soup.select("item")]
         except: pass
@@ -134,69 +126,59 @@ def create_report(keywords, days, target_id):
     now_str = now_korea.strftime('%Y-%m-%d | %H:%M')
     
     if len(final_items) > 0:
-        header = (
-            f"<b>[뉴스 모니터링 결과]</b>\n"
-            f"🎯 키워드: {', '.join(keywords)}\n"
-            f"🗓️ 기간: {days}일간\n"
-            f"📝 총 {len(final_items)}건의 기사"
+        # [텔레그램 헤더 양식 - 성훈님 카톡 버전과 100% 동일하게 행 나눔]
+        report_header = (
+            f"=== 언론 뉴스 검색 ===\n"
+            f"🎯 검색 단어 : {', '.join(keywords)}\n"
+            f"🗓️ 검색 시간 : {now_str}\n"
+            f"🗓️ 검색 기간 : {days}일\n"
+            f"📝 해당 기사 : 총 {len(final_items)}건"
         )
-        send_telegram(header, target_id)
+        send_telegram(report_header, target_id)
 
+        # [기사 목록 양식 - 행 나눔 적용]
         for idx, it in enumerate(final_items, 1):
             msg = (
-                f"<b>[{idx}] {it['title']}</b>\n"
-                f"🗓️ {it['date']} | 📰 {it['media']}\n"
-                f"🔗 <a href='{shorten_url(it['url'])}'>기사보기</a>"
+                f"[{idx}] {it['title']}\n"
+                f"🗓️ 발행시간: {it['date']}\n"
+                f"📰 언론사: {it['media']}\n"
+                f"🔗 링크: {shorten_url(it['url'])}\n"
             )
             send_telegram(msg, target_id)
-    
+            
     return {"keywords": ", ".join(keywords), "time": now_str, "days": days, "count": len(final_items)}
 
-# --- [3] 메인 UI 실행부 ---
-if __name__ == "__main__":
-    st.markdown(
-        """
-        <div style="text-align: center;">
-            <h3 style="margin-bottom: 0px;">🎯 News Monitor (텔레그램)</h3>
-            <p style="font-size: 13px; color: grey; margin-top: 5px;">
-                Copyright by <span style="color: #1E90FF; font-weight: bold;">성훈</span>
-            </p>
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+# --- [3] 메인 UI (성훈님 카톡 버전 UI 그대로 유지) ---
+st.markdown("""<div style="text-align: center;"><h3 style="margin-bottom: 0px;">🎯 News Monitor (텔레그램)</h3><p style="font-size: 13px; color: grey; margin-top: 5px;">Copyright by <span style="color: #1E90FF; font-weight: bold;">성훈</span></p></div>""", unsafe_allow_html=True)
+st.write("")
 
-    # [핵심] URL 파라미터에서 ID 읽어오기
-    query_params = st.query_params
-    # 주소에 ?id=숫자 가 있으면 그걸 쓰고, 없으면 성훈님 기본 ID 사용
-    default_id = query_params.get("id", MY_CHAT_ID)
+query_id = st.query_params.get("id", MY_CHAT_ID)
 
-    with st.form("search_form"):
-        # 친구가 본인 ID를 한 번 입력하면 그 세션 동안은 유지됨
-        target_id_input = st.text_input("메시지 받을 텔레그램 ID (숫자)", value=default_id)
-        kw_input = st.text_input("키워드(쉼표 구분)", placeholder="예: 올타이트, altite")
-        day_input = st.slider("검색 기간 (일)", 1, 100, 1)
-        submit_button = st.form_submit_button("뉴스 검색 및 텔레그램 전송")
+with st.form("search_form"):
+    # 친구 ID 기능을 위해 입력창만 추가
+    target_id_input = st.text_input("메시지 받을 텔레그램 ID", value=query_id)
+    kw_input = st.text_input("키워드(쉼표 구분)", placeholder="예: 올타이트, altite")
+    day_input = st.slider("검색 기간 (일)", 1, 100, 1)
+    submit_button = st.form_submit_button("뉴스 검색 및 텔레그램 전송")
 
-    if submit_button and kw_input:
-        if not target_id_input:
-            st.error("텔레그램 ID를 입력해주세요!")
+if submit_button and kw_input:
+    st.query_params["id"] = target_id_input
+    with st.spinner('뉴스 수집 中...'):
+        report = create_report([k.strip() for k in kw_input.split(",")], day_input, target_id_input)
+        
+        if report['count'] > 0:
+            st.success(f"✅ 총 {report['count']}건 뉴스, 텔레그램 전송 완료!")
+            st.balloons()
         else:
-            # 검색 시 입력한 ID를 URL 파라미터에 업데이트 (새로고침 시 유지용)
-            st.query_params["id"] = target_id_input
-            with st.spinner('뉴스 수집 및 텔레그램 전송 中...'):
-                report = create_report([k.strip() for k in kw_input.split(",")], day_input, target_id_input)
-                
-                if report['count'] > 0:
-                    st.success(f"✅ 총 {report['count']}건 뉴스, 텔레그램(ID:{target_id_input}) 전송 완료!")
-                    st.balloons()
-                else:
-                    st.warning("⚠️ 검색된 뉴스 X, 전송 X")
-                
-                st.markdown("---")
-                st.info(f"""
-                🎯 **검색 단어** : {report['keywords']}  
-                🗓️ **검색 시간** : {report['time']}  
-                🗓️ **검색 기간** : {report['days']}일  
-                📝 **해당 기사** : 총 {report['count']}건
-                """)
+            st.warning("⚠️ 검색된 뉴스 X, 텔레그램 전송 X")
+            
+        st.markdown("---")
+        st.markdown(f"### 📊 검색 결과 요약")
+        # [성훈님 요청 양식 그대로]
+        st.info(f"""
+        🎯 **검색 단어** : {report['keywords']}  
+        🗓️ **검색 시간** : {report['time']}  
+        🗓️ **검색 기간** : {report['days']}일  
+        📝 **해당 기사** : 총 {report['count']}건
+        """)
+        st.markdown("---")
