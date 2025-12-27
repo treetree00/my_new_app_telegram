@@ -163,7 +163,7 @@ if __name__ == "__main__":
     st.markdown(
         """
         <div style="text-align: center;">
-            <h3 style="margin-bottom: 0px;">🎯 News Monitor (TG)</h3>
+            <h3 style="margin-bottom: 0px;">🎯 News Monitor (텔레그램)</h3>
             <p style="font-size: 13px; color: grey; margin-top: 5px;">
                 Copyright by <span style="color: #1E90FF; font-weight: bold;">성훈</span>
             </p>
