@@ -149,7 +149,7 @@ def create_report(keywords, days, target_id):
     return {"keywords": ", ".join(keywords), "time": now_str, "days": days, "count": len(final_items)}
 
 # --- [3] 메인 UI (성훈님 카톡 버전 UI 그대로 유지) ---
-st.markdown("""<div style="text-align: center;"><h3 style="margin-bottom: 0px;">🎯 News Monitor (텔레그램)</h3><p style="font-size: 13px; color: grey; margin-top: 5px;">Copyright by <span style="color: #1E90FF; font-weight: bold;">성훈</span></p></div>""", unsafe_allow_html=True)
+st.markdown("""<div style="text-align: center;"><h3 style="margin-bottom: 0px;">🎯 News Monitor (텔레)</h3><p style="font-size: 13px; color: grey; margin-top: 5px;">Copyright by <span style="color: #1E90FF; font-weight: bold;">성훈</span></p></div>""", unsafe_allow_html=True)
 st.write("")
 
 query_id = st.query_params.get("id", MY_CHAT_ID)
