@@ -175,7 +175,7 @@ if __name__ == "__main__":
     st.write("")
 
     with st.form("search_form"):
-        kw_input = st.text_input("키워드(쉼표 구분)", placeholder="예: 올타이트, altite")
+        kw_input = st.text_input("키워드(쉼표 구분)", placeholder="예: 올타이트, alltite")
         day_input = st.slider("검색 기간 (일)", 1, 100, 1)
         submit_button = st.form_submit_button("뉴스 검색 및 텔레그램 전송")
 
