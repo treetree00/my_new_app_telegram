@@ -157,7 +157,7 @@ query_id = st.query_params.get("id", MY_CHAT_ID)
 with st.form("search_form"):
     # 친구 ID 기능을 위해 입력창만 추가
     target_id_input = st.text_input("메시지 받을 텔레그램 ID", value=query_id)
-    kw_input = st.text_input("키워드(쉼표 구분)", placeholder="예: 올타이트, altite")
+    kw_input = st.text_input("키워드(쉼표 구분)", placeholder="예: 올타이트, alltite")
     day_input = st.slider("검색 기간 (일)", 1, 100, 1)
     submit_button = st.form_submit_button("뉴스 검색 및 텔레그램 전송")
 
